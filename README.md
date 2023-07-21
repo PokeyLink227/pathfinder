@@ -1,0 +1,3 @@
+Pathfinder
+
+Pathfinding visualization project
