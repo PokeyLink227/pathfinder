@@ -40,6 +40,10 @@ enum DIRECTIONS {
     DIR_LEFT,
 };
 
+typedef struct Point2D {
+    int x, y;
+} Point2D;
+
 typedef struct node {
     int parent;
     int f, g, h, loc;
@@ -100,7 +104,7 @@ void list_print(NList *l) {
 int wrap_range(int i, int rng) {
     if (i >= 0 && i < rng) return i;
     if (i >= rng) return i % rng;
-    return rng - (-i) % 5;
+    return rng - (-i) % rng;
 }
 
 int dist(int i1, int i2, int width) {
@@ -212,6 +216,16 @@ int AStarFull(GridData gd, NList *openList) {
     return ALGO_COMPLETE;
 }
 
+Point2D WintoWorld(Point2D pt, Point2D cam, GridData gd) {
+    pt.x -= cam.x;
+    pt.y -= cam.y;
+    return (Point2D){0, 0};
+}
+
+char ContainsPoint(GridData gd, Point2D pt) {
+    return (pt.x >= 0 && pt.x < gd.width && pt.y >= 0 && pt.y < gd.height);
+}
+
 int main() {
     int screen_width = 800, screen_height = 800;
     InitWindow(screen_width, screen_height, "A-Star Demo");
@@ -247,6 +261,12 @@ int main() {
     char left_mouse_pressed = 0, dragging_start = 0, dragging_end = 0;
 
 
+
+    int cbx = 0, cbw = 800, cby = 100, cbh = 800;
+    int mbx = 0, mbw = 800, mby = 000, mbh = 100;
+    char drag = 0; // 0:none, 1:start, 2:end
+
+
     while (!WindowShouldClose()) {
         mouse_x_last = mouse_x;
         mouse_y_last = mouse_y;
@@ -274,62 +294,67 @@ int main() {
 
 
         if (IsMouseButtonDown(0)) {
-            for (int i = 0; i < 4; i++) if (!left_mouse_pressed && mouse_x >= buttons[i].x && mouse_x < buttons[i].x + buttons[i].width && mouse_y >= buttons[i].y && mouse_y < buttons[i].y + buttons[i].height) {
-                printf("[%s] button clicked\n", buttons[i].text);
-                if (i == 0 && !found) { // start button
-                    found = AStarFull(gd, &openList);
-                    break;
-                } else if (i == 1) { // reset all button
-                    for (int i = 0; i < gd.size; i++) {
-                        gd.grid[i].loc = LOC_GRID;
-                        gd.grid[i].parent = -1;
+            if (mouse_x >= mbx && mouse_x < mbw && mouse_y >= mby && mouse_y < mbh) {
+                for (int i = 0; i < 4; i++) if (!left_mouse_pressed && mouse_x >= buttons[i].x && mouse_x < buttons[i].x + buttons[i].width && mouse_y >= buttons[i].y && mouse_y < buttons[i].y + buttons[i].height) {
+                    printf("[%s] button clicked\n", buttons[i].text);
+                    if (i == 0 && !found) { // start button
+                        found = AStarFull(gd, &openList);
+                        break;
+                    } else if (i == 1) { // reset all button
+                        for (int i = 0; i < gd.size; i++) {
+                            gd.grid[i].loc = LOC_GRID;
+                            gd.grid[i].parent = -1;
+                        }
+                        openList.length = 0;
+                        found = 0;
+                        break;
+                    } else if (i == 2) { // clear walls
+                        for (int i = 0; i < gd.size; i++) if (gd.grid[i].loc == LOC_WALL) gd.grid[i].loc = LOC_GRID;
+                        break;
+                    } else if (i == 3) { // clear paths
+                        for (int i = 0; i < gd.size; i++) if (gd.grid[i].loc != LOC_WALL) gd.grid[i].loc = LOC_GRID;
+                        openList.length = 0;
+                        found = 0;
+                        printf("paths cleared\n");
+                        break;
                     }
-                    openList.length = 0;
-                    found = 0;
-                    break;
-                } else if (i == 2) {
-                    for (int i = 0; i < gd.size; i++) if (gd.grid[i].loc == LOC_WALL) gd.grid[i].loc = LOC_GRID;
-                    break;
-                } else if (i == 3) {
-                    for (int i = 0; i < gd.size; i++) if (gd.grid[i].loc != LOC_WALL) gd.grid[i].loc = LOC_GRID;
-                    openList.length = 0;
-                    found = 0;
-                    break;
                 }
             }
-            // this is stupid but its late and i cant think of anything else
-            if (dragging_start) {
-                gd.start_pos = (mouse_y + camera.y - 100) / cell_width * gd.width + (mouse_x + camera.x) / cell_width;
-            }else if (dragging_end) {
-                gd.end_pos = (mouse_y + camera.y - 100) / cell_width * gd.width + (mouse_x + camera.x) / cell_width;
-            } else if ((mouse_y + camera.y - 100) / cell_width * gd.width + (mouse_x + camera.x) / cell_width == gd.start_pos) {
-                dragging_start = 1;
-            } else if ((mouse_y + camera.y - 100) / cell_width * gd.width + (mouse_x + camera.x) / cell_width == gd.end_pos) {
-                dragging_end = 1;
-            } else { // paint on grid
-                int dist = maxi_mag((mouse_x / cell_width - mouse_x_last / cell_width), (mouse_y / cell_width - mouse_y_last / cell_width));
-                for (int i = 0; i <= dist; i++) {
-                    float t = dist == 0 ? 0 : (float)i / dist;
-                    int lerp_x = (float)mouse_x_last * (1.0f - t) + (float)mouse_x * t, lerp_y = (float)mouse_y_last * (1.0f - t) + (float)mouse_y * t;
-                    grid[(lerp_y + camera.y - 100) / cell_width * gd.width + (lerp_x + camera.x) / cell_width].loc = LOC_WALL;
+            else if (mouse_x >= cbx && mouse_x < cbw && mouse_y >= cby && mouse_y < cbh) { // clicked on canvas area
+                int pos = (mouse_y + camera.y - 100) / cell_width * gd.width + (mouse_x + camera.x) / cell_width;
+
+                if (IsKeyDown(KEY_SPACE)) {
+                    camera.x += mouse_x_last - mouse_x;
+                    camera.y += mouse_y_last - mouse_y;
+
+                    if (camera.x + camera.width > (gd.width - 1) * cell_width + screen_width) camera.x = (gd.width - 1) * cell_width;
+                    if (camera.x < cell_width - camera.width) camera.x = cell_width - camera.width;
+                    if (camera.y + camera.height > (gd.height - 1) * cell_width + camera.height) camera.y = (gd.height - 1) * cell_width;
+                    if (camera.y < cell_width - camera.height) camera.y = cell_width - camera.height;
                 }
+                else if (dragging_start) gd.start_pos = (mouse_y + camera.y - 100) / cell_width * gd.width + (mouse_x + camera.x) / cell_width;
+                else if (dragging_end) gd.end_pos = (mouse_y + camera.y - 100) / cell_width * gd.width + (mouse_x + camera.x) / cell_width;
+                else if (!left_mouse_pressed && pos == gd.start_pos) dragging_start = 1;
+                else if (!left_mouse_pressed && pos == gd.end_pos) dragging_end = 1;
+                else {
+                    int dist = maxi_mag((mouse_x / cell_width - mouse_x_last / cell_width), (mouse_y / cell_width - mouse_y_last / cell_width));
+                    for (int i = 0; i <= dist; i++) {
+                        float t = dist == 0 ? 0 : (float)i / (float)dist;
+                        int lerp_x = ((float)mouse_x_last * (1.0f - t) + (float)mouse_x * t + camera.x) / cell_width,
+                        lerp_y = ((float)mouse_y_last * (1.0f - t) + (float)mouse_y * t + camera.y - 100) / cell_width;
+                        if (ContainsPoint(gd, (Point2D){lerp_x, lerp_y}) && lerp_y * gd.width + lerp_x != gd.start_pos && lerp_y * gd.width + lerp_x != gd.end_pos) grid[lerp_y * gd.width + lerp_x].loc = LOC_WALL;
+                    }
+                }
+
             }
             left_mouse_pressed = 1;
-        } else {
+
+        } else if (left_mouse_pressed) {
             left_mouse_pressed = 0;
             if (dragging_start) dragging_start = 0;
             if (dragging_end) dragging_end = 0;
         }
 
-        if (IsMouseButtonDown(1)) { // move camera
-            camera.x += mouse_x_last - mouse_x;
-            camera.y += mouse_y_last - mouse_y;
-
-            if (camera.x + camera.width > (gd.width - 1) * cell_width + screen_width) camera.x = (gd.width - 1) * cell_width;
-            if (camera.x < cell_width - camera.width) camera.x = cell_width - camera.width;
-            if (camera.y + camera.height > (gd.height - 1) * cell_width + camera.height) camera.y = (gd.height - 1) * cell_width;
-            if (camera.y < cell_width - camera.height) camera.y = cell_width - camera.height;
-        }
 
 
         if (IsKeyDown(KEY_ENTER) && found <= 1) for (int i = 0; i < 10 && found <= 1; i++) found = AStarStep(gd, &openList, found);
