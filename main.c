@@ -367,7 +367,8 @@ int main() {
             if (cell_width < 1) cell_width = 1;
 
             camera.x = (camera.x + mouse.x) * cell_width / cell_width_previous - mouse.x;
-            camera.y = (camera.y + mouse.y) * cell_width / cell_width_previous - mouse.y;
+            camera.y = (camera.y + mouse.y - window_area.y) * cell_width / cell_width_previous - mouse.y + window_area.y;
+
             if (camera.x + window_area.width > (gd.width - 1) * cell_width + screen_width) camera.x = (gd.width - 1) * cell_width;
             if (camera.x < cell_width - window_area.width) camera.x = cell_width - window_area.width;
             if (camera.y + window_area.height > (gd.height - 1) * cell_width + window_area.height) camera.y = (gd.height - 1) * cell_width;
