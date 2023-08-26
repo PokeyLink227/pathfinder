@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include "raylib.h"
 
 /*
@@ -65,6 +66,9 @@ enum ui_element_type {
     UI_NONE = 0,
     UI_WINDOW = 1,
     UI_BUTTON = 2,
+    UI_TEXT = 3,
+    UI_SLIDER = 4,
+    UI_DROPDOWN = 5,
     UI_VISIBLE = 1,
     UI_INVISIBLE = 0,
     UI_INTERACTABLE = 1,
@@ -75,7 +79,16 @@ typedef struct ui_element {
     int x, y, width, height;
     char *text;
     char type, visible, capture;
+    void *data;
 } UI_Element;
+
+typedef struct ui_slider_data {
+    int min, max, val;
+} UI_SliderData;
+
+typedef struct ui_dropdown_data {
+    int numelements, selectedelement;
+} UI_DropdownData;
 
 int list_index_of(NList *l, int ele) {
     for (int i = 0; i < l->length; i++) if (l->nodes[i] == ele) return i;
@@ -237,14 +250,16 @@ int main() {
     InitWindow(screen_width, screen_height, "A-Star Demo");
     SetTargetFPS(60);
 
-    UI_Element menu_area = {0, 0, 800, 100, 0, UI_WINDOW, UI_INVISIBLE, UI_NONINTERACTABLE};
-    UI_Element window_area = {0, 100, 800, 700, 0, UI_WINDOW, UI_INVISIBLE, UI_NONINTERACTABLE};
+    UI_Element menu_area = {0, 0, 800, 100, 0, UI_WINDOW, UI_INVISIBLE, UI_NONINTERACTABLE, 0};
+    UI_Element window_area = {0, 100, 800, 700, 0, UI_WINDOW, UI_INVISIBLE, UI_NONINTERACTABLE, 0};
+    UI_SliderData speedslider_data = {0, 120, 15};
+    char str[50] = "Speed: ";
     UI_Element buttons[8] = {
-        (UI_Element){10, 10, 90, 35, "Start", UI_BUTTON, UI_VISIBLE, UI_INTERACTABLE},
-        (UI_Element){10, 55, 90, 35, "Clear All", UI_BUTTON, UI_VISIBLE, UI_INTERACTABLE},
-        (UI_Element){110, 55, 90, 35, "Clear Walls", UI_BUTTON, UI_VISIBLE, UI_INTERACTABLE},
-        (UI_Element){210, 55, 90, 35, "Clear Paths", UI_BUTTON, UI_VISIBLE, UI_INTERACTABLE},
-        (UI_Element){110, 10, 90, 35, "asd", UI_BUTTON, UI_VISIBLE, UI_INTERACTABLE},
+        (UI_Element){10, 10, 120, 35, "Start", UI_BUTTON, UI_VISIBLE, UI_INTERACTABLE, 0},
+        (UI_Element){10, 55, 120, 35, "Clear All", UI_BUTTON, UI_VISIBLE, UI_INTERACTABLE, 0},
+        (UI_Element){140, 55, 120, 35, "Clear Paths", UI_BUTTON, UI_VISIBLE, UI_INTERACTABLE, 0},
+        (UI_Element){140, 10, 120, 35, str, UI_TEXT, UI_VISIBLE, UI_NONINTERACTABLE, 0},
+        (UI_Element){270, 10, 120, 35, "SPEEDSLIDER", UI_SLIDER, UI_VISIBLE, UI_INTERACTABLE, &speedslider_data},
         (UI_Element){0},
         (UI_Element){0},
         (UI_Element){0}
@@ -261,7 +276,7 @@ int main() {
     int open_raw[10000];
     NList openList = (NList){open_raw, 0, 10000};
 
-    int count = 0, found = 0;
+    int count = 0, status = 0;
     char left_mouse_pressed = 0, dragging_start = 0, dragging_end = 0;
 
     Point2D mouse = {0, 0}, mouse_last = {0, 0}, camera = {0, 0};
@@ -271,6 +286,23 @@ int main() {
         mouse_last.y = mouse.y;
         mouse.x = GetMouseX();
         mouse.y = GetMouseY();
+
+        if (IsKeyPressed(KEY_S)) {
+            printf("saving\n");
+            FILE *fp;
+            fp = fopen("grid.sav", "wb");
+            fwrite(&gd, sizeof(GridData), 1, fp);
+            fwrite(grid, sizeof(Node), 10000, fp);
+            fclose(fp);
+        }
+        if (IsKeyPressed(KEY_L)) {
+            printf("loading\n");
+            FILE *fp;
+            fp = fopen("grid.sav", "rb");
+            fread(&gd, sizeof(GridData), 1, fp);
+            fread(grid, sizeof(Node), 10000, fp);
+            fclose(fp);
+        }
 
 
         if (IsKeyDown(KEY_RIGHT)) {
@@ -295,8 +327,9 @@ int main() {
             if (UI_ContainsPoint(menu_area, mouse)) {
                 for (int i = 0; i < 4; i++) if (!left_mouse_pressed && UI_ContainsPoint(buttons[i], mouse)) {
                     printf("[%s] button clicked\n", buttons[i].text);
-                    if (i == 0 && !found) { // start button
-                        found = AStarFull(gd, &openList);
+                    if (i == 0 && status < ALGO_FOUND) { // start button
+                        if ((*(UI_SliderData *)(buttons[4].data)).val == 0) status = AStarFull(gd, &openList);
+                        else if (count % (*(UI_SliderData *)(buttons[4].data)).val == 0) status = AStarStep(gd, &openList, status);
                         break;
                     } else if (i == 1) { // reset all button
                         for (int i = 0; i < gd.size; i++) {
@@ -304,18 +337,18 @@ int main() {
                             gd.grid[i].parent = -1;
                         }
                         openList.length = 0;
-                        found = 0;
+                        status = 0;
                         break;
-                    } else if (i == 2) { // clear walls
-                        for (int i = 0; i < gd.size; i++) if (gd.grid[i].loc == LOC_WALL) gd.grid[i].loc = LOC_GRID;
-                        break;
-                    } else if (i == 3) { // clear paths
+                    } else if (i == 2) { // clear paths
                         for (int i = 0; i < gd.size; i++) if (gd.grid[i].loc != LOC_WALL) gd.grid[i].loc = LOC_GRID;
                         openList.length = 0;
-                        found = 0;
+                        status = 0;
                         printf("paths cleared\n");
                         break;
                     }
+                }
+                if (UI_ContainsPoint(buttons[4], mouse)) {
+                    (*(UI_SliderData *)(buttons[4].data)).val = (int)((float)(mouse.x - buttons[4].x) / buttons[4].width * ((*(UI_SliderData *)(buttons[4].data)).max - (*(UI_SliderData *)(buttons[4].data)).min) + (*(UI_SliderData *)(buttons[4].data)).min);
                 }
             }
             else if (UI_ContainsPoint(window_area, mouse)) { // clicked on canvas area
@@ -355,7 +388,7 @@ int main() {
 
 
 
-        if (IsKeyDown(KEY_ENTER) && found <= 1) for (int i = 0; i < 10 && found <= 1; i++) found = AStarStep(gd, &openList, found);
+        //if (IsKeyDown(KEY_ENTER) && status <= 1) for (int i = 0; i < 10 && status <= 1; i++) status = AStarStep(gd, &openList, status);
 
         int size_diff = (int)GetMouseWheelMove();
         if (size_diff != 0) {
@@ -376,7 +409,7 @@ int main() {
 
         }
 
-
+        sprintf(buttons[3].text, "Speed: %i", (*(UI_SliderData *)(buttons[4].data)).val);
 
 
         BeginDrawing();
@@ -391,9 +424,24 @@ int main() {
 
             DrawRectangle(0, 0, 800, 100, LIGHTGRAY);
 
-            for (int i = 0; i < 4; i++) {
-                DrawRectangle(buttons[i].x, buttons[i].y, buttons[i].width, buttons[i].height, WHITE);
-                DrawText(buttons[i].text, buttons[i].x, buttons[i].y, 20, BLACK);
+            for (int i = 0; i < 5; i++) {
+                switch (buttons[i].type) {
+                    case UI_BUTTON: {
+                        DrawRectangle(buttons[i].x, buttons[i].y, buttons[i].width, buttons[i].height, WHITE);
+                        DrawText(buttons[i].text, buttons[i].x, buttons[i].y, 20, BLACK);
+                        break;
+                    }
+                    case UI_TEXT: {
+                        DrawText(buttons[i].text, buttons[i].x, buttons[i].y, 20, BLACK);
+                        break;
+                    }
+                    case UI_SLIDER: {
+                        DrawRectangle(buttons[i].x, buttons[i].y, buttons[i].width, buttons[i].height, WHITE);
+                        DrawRectangle(buttons[i].x + (*(UI_SliderData *)(buttons[4].data)).val - 5, buttons[i].y + 15, 10, 10, BLACK);
+                        break;
+                    }
+                }
+
             }
         EndDrawing();
     }
