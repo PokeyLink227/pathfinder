@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "raylib.h"
+#include <math.h>
 
 /*
 todo
@@ -47,7 +48,8 @@ typedef struct Point2D {
 
 typedef struct node {
     int parent;
-    int f, g, h, loc;
+    float f, g, h;
+    int loc;
 } Node;
 
 typedef struct GridData {
@@ -120,8 +122,8 @@ int wrap_range(int i, int rng) {
     return rng - (-i) % rng;
 }
 
-int dist(int i1, int i2, int width) {
-    return (i1 % width - i2 % width) * (i1 % width - i2 % width) + (i1 / width - i2 / width) * (i1 / width - i2 / width);
+float dist(int i1, int i2, int width) {
+    return sqrt((i1 % width - i2 % width) * (i1 % width - i2 % width) + (i1 / width - i2 / width) * (i1 / width - i2 / width));
 }
 
 int maxi_mag(int lhs, int rhs) {
@@ -148,6 +150,7 @@ char UI_ContainsPoint(UI_Element ele, Point2D pt) {
 }
 
 // ALGORITHMS
+/*
 int AStarStep(GridData gd, NList *openList, char status) {
     int dir[8] = {-1 - gd.width, -gd.width, 1 - gd.width, 1, 1 + gd.width, gd.width, -1 + gd.width, -1};
 
@@ -195,7 +198,7 @@ int AStarStep(GridData gd, NList *openList, char status) {
     }
     return ALGO_INPROGRESS;
 }
-
+*/
 int AStarFull(GridData gd, NList *openList) {
     int dir[8] = {-1 - gd.width, -gd.width, 1 - gd.width, 1, 1 + gd.width, gd.width, -1 + gd.width, -1};
 
@@ -222,6 +225,7 @@ int AStarFull(GridData gd, NList *openList) {
             }
             return ALGO_FOUND;
         }
+
         for (int i = 0; i < 8; i++) {
             int next = current + dir[i];
             if (next >= 0 && next < gd.size && gd.grid[next].loc != LOC_WALL) {
@@ -230,14 +234,13 @@ int AStarFull(GridData gd, NList *openList) {
                 // account for edge wraping
                 if (next % gd.width - current % gd.width < -1 || next % gd.width - current % gd.width > 1) continue;
 
-                int g_temp = gd.grid[current].g + dist(current, next, gd.width);
-                int h_temp = dist(next, gd.end_pos, gd.width);
-                int f_temp = g_temp + h_temp;
+                float g_temp = gd.grid[current].g + dist(current, next, gd.width);
+
                 if (gd.grid[next].loc == LOC_GRID) {
-                    gd.grid[next] = (Node){current, f_temp, g_temp, h_temp, LOC_OPEN};
+                    gd.grid[next] = (Node){current, g_temp + dist(next, gd.end_pos, gd.width), g_temp, -1, LOC_OPEN};
                     list_add(openList, next);
-                } else if (gd.grid[next].loc != LOC_GRID && f_temp < gd.grid[next].f) {
-                    gd.grid[next] = (Node){current, f_temp, g_temp, h_temp, gd.grid[next].loc};
+                } else if (gd.grid[next].loc == LOC_OPEN && g_temp < gd.grid[next].g) {
+                    gd.grid[next] = (Node){current, g_temp + dist(next, gd.end_pos, gd.width), g_temp, -1, gd.grid[next].loc};
                 }
             }
         }
@@ -252,7 +255,7 @@ int main() {
 
     UI_Element menu_area = {0, 0, 800, 100, 0, UI_WINDOW, UI_INVISIBLE, UI_NONINTERACTABLE, 0};
     UI_Element window_area = {0, 100, 800, 700, 0, UI_WINDOW, UI_INVISIBLE, UI_NONINTERACTABLE, 0};
-    UI_SliderData speedslider_data = {0, 120, 15};
+    UI_SliderData speedslider_data = {0, 120, 0};
     char str[50] = "Speed: ";
     UI_Element buttons[8] = {
         (UI_Element){10, 10, 120, 35, "Start", UI_BUTTON, UI_VISIBLE, UI_INTERACTABLE, 0},
@@ -329,7 +332,7 @@ int main() {
                     printf("[%s] button clicked\n", buttons[i].text);
                     if (i == 0 && status < ALGO_FOUND) { // start button
                         if ((*(UI_SliderData *)(buttons[4].data)).val == 0) status = AStarFull(gd, &openList);
-                        else if (count % (*(UI_SliderData *)(buttons[4].data)).val == 0) status = AStarStep(gd, &openList, status);
+                        //else if (count % (*(UI_SliderData *)(buttons[4].data)).val == 0) status = AStarStep(gd, &openList, status);
                         break;
                     } else if (i == 1) { // reset all button
                         for (int i = 0; i < gd.size; i++) {
