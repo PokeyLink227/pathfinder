@@ -127,18 +127,10 @@ float dist(int i1, int i2, int width) {
 }
 
 int maxi_mag(int lhs, int rhs) {
-    printf("%i  %i -> ", lhs, rhs);
     if (lhs < 0) lhs = -lhs;
     if (rhs < 0) rhs = -rhs;
-    printf("%i  %i -> ", lhs, rhs);
-    if (lhs > rhs) {
-        printf("%i\n", lhs);
-        return lhs;
-    }
-    else {
-        printf("%i\n", rhs);
-        return rhs;
-    }
+    if (lhs > rhs) return lhs;
+    else return rhs;
 }
 
 char ContainsPoint(GridData gd, Point2D pt) {
@@ -150,7 +142,7 @@ char UI_ContainsPoint(UI_Element ele, Point2D pt) {
 }
 
 // ALGORITHMS
-/*
+//*
 int AStarStep(GridData gd, NList *openList, char status) {
     int dir[8] = {-1 - gd.width, -gd.width, 1 - gd.width, 1, 1 + gd.width, gd.width, -1 + gd.width, -1};
 
@@ -185,20 +177,20 @@ int AStarStep(GridData gd, NList *openList, char status) {
             // account for edge wraping
             if (next % gd.width - current % gd.width < -1 || next % gd.width - current % gd.width > 1) continue;
 
-            int g_temp = gd.grid[current].g + dist(current, next, gd.width);
-            int h_temp = dist(next, gd.end_pos, gd.width);
-            int f_temp = g_temp + h_temp;
+            float g_temp = gd.grid[current].g + dist(current, next, gd.width);
+            float h_temp = dist(next, gd.end_pos, gd.width);
+            float f_temp = g_temp + h_temp;
             if (gd.grid[next].loc == LOC_GRID) {
                 gd.grid[next] = (Node){current, f_temp, g_temp, h_temp, LOC_OPEN};
                 list_add(openList, next);
-            } else if (gd.grid[next].loc != LOC_GRID && f_temp < gd.grid[next].f) {
+            } else if (gd.grid[next].loc == LOC_OPEN && g_temp < gd.grid[next].g) {
                 gd.grid[next] = (Node){current, f_temp, g_temp, h_temp, gd.grid[next].loc};
             }
         }
     }
     return ALGO_INPROGRESS;
 }
-*/
+//*/
 int AStarFull(GridData gd, NList *openList) {
     int dir[8] = {-1 - gd.width, -gd.width, 1 - gd.width, 1, 1 + gd.width, gd.width, -1 + gd.width, -1};
 
@@ -267,7 +259,6 @@ int main() {
         (UI_Element){0},
         (UI_Element){0}
     };
-    int cell_width = 8;
 
     // color legend for grid
     Color color_palette[8] = {WHITE, LIGHTGRAY, GREEN, BLACK, YELLOW, RED, BLUE};
@@ -282,7 +273,10 @@ int main() {
     int count = 0, status = 0;
     char left_mouse_pressed = 0, dragging_start = 0, dragging_end = 0;
 
-    Point2D mouse = {0, 0}, mouse_last = {0, 0}, camera = {0, 0};
+    Point2D mouse = {0, 0}, mouse_last = {0, 0}, camera = {200, 0};
+    int cell_width = 20;
+
+    char started = 0;
 
     while (!WindowShouldClose()) {
         mouse_last.x = mouse.x;
@@ -331,8 +325,7 @@ int main() {
                 for (int i = 0; i < 4; i++) if (!left_mouse_pressed && UI_ContainsPoint(buttons[i], mouse)) {
                     printf("[%s] button clicked\n", buttons[i].text);
                     if (i == 0 && status < ALGO_FOUND) { // start button
-                        if ((*(UI_SliderData *)(buttons[4].data)).val == 0) status = AStarFull(gd, &openList);
-                        //else if (count % (*(UI_SliderData *)(buttons[4].data)).val == 0) status = AStarStep(gd, &openList, status);
+                        started = 1;
                         break;
                     } else if (i == 1) { // reset all button
                         for (int i = 0; i < gd.size; i++) {
@@ -412,6 +405,13 @@ int main() {
 
         }
 
+        if (started) {
+            if ((*(UI_SliderData *)(buttons[4].data)).val == 0) status = AStarFull(gd, &openList);
+            else if (count % (*(UI_SliderData *)(buttons[4].data)).val == 0) status = AStarStep(gd, &openList, status);
+            if (status >= ALGO_FOUND) started = 0;
+        }
+
+
         sprintf(buttons[3].text, "Speed: %i", (*(UI_SliderData *)(buttons[4].data)).val);
 
 
@@ -447,6 +447,9 @@ int main() {
 
             }
         EndDrawing();
+
+
+        count++;
     }
 
 }
