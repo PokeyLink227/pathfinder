@@ -407,7 +407,7 @@ int main() {
 
         if (started) {
             if ((*(UI_SliderData *)(buttons[4].data)).val == 0) status = AStarFull(gd, &openList);
-            else if (count % (*(UI_SliderData *)(buttons[4].data)).val == 0) status = AStarStep(gd, &openList, status);
+            else for (int i = 0; i < 10 / (*(UI_SliderData *)(buttons[4].data)).val; i++) status = AStarStep(gd, &openList, status);
             if (status >= ALGO_FOUND) started = 0;
         }
 
