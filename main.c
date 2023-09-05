@@ -264,7 +264,7 @@ int main() {
     Color color_palette[8] = {WHITE, LIGHTGRAY, GREEN, BLACK, YELLOW, RED, BLUE};
 
     Node grid[10000];
-    GridData gd = {grid, 100, 100, 10000, 982, 1275};
+    GridData gd = {grid, 100, 100, 10000, 912, 1225};
     for (int i = 0; i < gd.size; i++) grid[i] = (Node){-1, -1, -1, -1, LOC_GRID};
 
     int open_raw[10000];
@@ -406,12 +406,14 @@ int main() {
         }
 
         if (started) {
-            if ((*(UI_SliderData *)(buttons[4].data)).val == 0) status = AStarFull(gd, &openList);
-            else for (int i = 0; i < 10 / (*(UI_SliderData *)(buttons[4].data)).val; i++) status = AStarStep(gd, &openList, status);
+            int v = (*(UI_SliderData *)(buttons[4].data)).val;
+            if (v == 0) status = AStarFull(gd, &openList);
+            else if (v < 10) for (int i = 0; i < 10 / v; i++) status = AStarStep(gd, &openList, status);
+            else if (count % (v / 10) == 0) status = AStarStep(gd, &openList, status);
             if (status >= ALGO_FOUND) started = 0;
         }
 
-
+        // only update when slider changes
         sprintf(buttons[3].text, "Speed: %i", (*(UI_SliderData *)(buttons[4].data)).val);
 
 
