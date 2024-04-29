@@ -408,8 +408,8 @@ int main() {
         if (started) {
             int v = (*(UI_SliderData *)(buttons[4].data)).val;
             if (v == 0) status = AStarFull(gd, &openList);
-            else if (v < 10) for (int i = 0; i < 10 / v; i++) status = AStarStep(gd, &openList, status);
-            else if (count % (v / 10) == 0) status = AStarStep(gd, &openList, status);
+            else if (v < 50) for (int i = 0; i < 50 - v; i++) status = AStarStep(gd, &openList, status);
+            else if (count % (v / 50) == 0) status = AStarStep(gd, &openList, status);
             if (status >= ALGO_FOUND) started = 0;
         }
 
